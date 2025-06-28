@@ -87,6 +87,7 @@
         let onGround = false;
         let score = 0;
         let startTime, gameActive = false, audioContext;
+        let lastFootstepTime = 0, bgmInterval;
 
         const objects = [];
         const targets = [];
@@ -200,6 +201,7 @@
 
         function resetGame() {
             gameActive = false;
+            if (bgmInterval) clearInterval(bgmInterval);
 
             // Clear existing targets
             targets.forEach(target => scene.remove(target));
@@ -236,6 +238,7 @@
         function startGame() {
             gameActive = true;
             startTime = performance.now();
+            playBGM();
         }
 
         function spawnTargets() {
@@ -285,23 +288,36 @@
 
         function shoot() {
             if (!controls.isLocked || !gameActive) return;
+            if (!audioContext) return;
 
-            if (!audioContext) return; // AudioContext might not be ready yet
-
-            // Create a gunshot sound
+            // Gunshot sound
+            const now = audioContext.currentTime;
             const gainNode = audioContext.createGain();
-            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.15);
+            gainNode.connect(audioContext.destination);
+            gainNode.gain.setValueAtTime(1, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
 
             const oscillator = audioContext.createOscillator();
-            oscillator.type = 'noise'; // Use noise for a more gunshot-like sound
-            oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
-
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(440, now);
+            oscillator.frequency.exponentialRampToValueAtTime(30, now + 0.2);
             oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
 
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.15);
+            const noise = audioContext.createBufferSource();
+            const bufferSize = audioContext.sampleRate * 0.2;
+            const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            noise.buffer = buffer;
+            noise.connect(gainNode);
+
+            oscillator.start(now);
+            noise.start(now);
+            oscillator.stop(now + 0.2);
+            noise.stop(now + 0.2);
+
 
             const raycaster = new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()), camera.getWorldDirection(new THREE.Vector3()));
             const intersects = raycaster.intersectObjects(targets);
@@ -343,6 +359,12 @@
             }
 
             if (controls.isLocked) {
+                const isMoving = moveForward.value || moveBackward.value || moveLeft.value || moveRight.value;
+                if (isMoving && onGround && time - lastFootstepTime > 400) {
+                    playFootstepSound();
+                    lastFootstepTime = time;
+                }
+
                 // Gravity
                 velocity.y -= 9.8 * delta;
 
@@ -368,11 +390,66 @@
                     velocity.y = 0;
                     controls.getObject().position.y = 1.8;
                     canJump.value = true;
+                    onGround = true;
+                } else {
+                    onGround = false;
                 }
             }
 
             prevTime = time;
             renderer.render(scene, camera);
+        }
+
+        function playFootstepSound() {
+            if (!audioContext) return;
+            const now = audioContext.currentTime;
+
+            const gainNode = audioContext.createGain();
+            gainNode.gain.setValueAtTime(0.1, now);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+            gainNode.connect(audioContext.destination);
+
+            const noise = audioContext.createBufferSource();
+            const bufferSize = audioContext.sampleRate * 0.2;
+            const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = Math.random() * 2 - 1;
+            }
+            noise.buffer = buffer;
+            
+            const filter = audioContext.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 400;
+            
+            noise.connect(filter).connect(gainNode);
+            noise.start(now);
+            noise.stop(now + 0.2);
+        }
+
+        function playBGM() {
+            if (!audioContext) return;
+            const notes = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25]; // C Major Pentatonic
+            let noteIndex = 0;
+
+            bgmInterval = setInterval(() => {
+                const now = audioContext.currentTime;
+                const gainNode = audioContext.createGain();
+                gainNode.connect(audioContext.destination);
+                gainNode.gain.setValueAtTime(0, now);
+                gainNode.gain.linearRampToValueAtTime(0.05, now + 0.1);
+                gainNode.gain.linearRampToValueAtTime(0, now + 0.5);
+
+
+                const oscillator = audioContext.createOscillator();
+                oscillator.type = 'sine';
+                const freq = notes[Math.floor(Math.random() * notes.length)];
+                oscillator.frequency.setValueAtTime(freq, now);
+                oscillator.connect(gainNode);
+
+                oscillator.start(now);
+                oscillator.stop(now + 0.5);
+            }, 600);
         }
 
         init();
