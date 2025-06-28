@@ -86,7 +86,7 @@
         let direction = new THREE.Vector3();
         let onGround = false;
         let score = 0;
-        let startTime, gameActive = false;
+        let startTime, gameActive = false, audioContext;
 
         const objects = [];
         const targets = [];
@@ -121,6 +121,11 @@
             controls = new PointerLockControls(camera, document.body);
             instructions.addEventListener('click', () => {
                 controls.lock();
+                // Initialize and resume AudioContext on the first user gesture
+                if (!audioContext) {
+                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                audioContext.resume();
             });
             controls.addEventListener('lock', () => {
                 instructions.style.display = 'none';
@@ -189,7 +194,7 @@
             // Event Listeners
             document.addEventListener('keydown', onKeyDown);
             document.addEventListener('keyup', onKeyUp);
-            document.addEventListener('click', shoot);
+            document.addEventListener('mousedown', shoot); // Changed from 'click' to 'mousedown'
             window.addEventListener('resize', onWindowResize);
         }
 
@@ -280,6 +285,23 @@
 
         function shoot() {
             if (!controls.isLocked || !gameActive) return;
+
+            if (!audioContext) return; // AudioContext might not be ready yet
+
+            // Create a gunshot sound
+            const gainNode = audioContext.createGain();
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.15);
+
+            const oscillator = audioContext.createOscillator();
+            oscillator.type = 'noise'; // Use noise for a more gunshot-like sound
+            oscillator.frequency.setValueAtTime(1000, audioContext.currentTime);
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.15);
 
             const raycaster = new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()), camera.getWorldDirection(new THREE.Vector3()));
             const intersects = raycaster.intersectObjects(targets);
