@@ -168,8 +168,12 @@
             objects.push(floor);
 
             // Walls
+            const wallTexture = new THREE.TextureLoader().load('https://threejs.org/examples/textures/brick_diffuse.jpg');
+            wallTexture.wrapS = THREE.RepeatWrapping;
+            wallTexture.wrapT = THREE.RepeatWrapping;
+            wallTexture.repeat.set(20, 1);
             const wallGeometry = new THREE.BoxGeometry(100, 5, 1);
-            const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x808080 });
+            const wallMaterial = new THREE.MeshStandardMaterial({ map: wallTexture });
             const wall1 = new THREE.Mesh(wallGeometry, wallMaterial);
             wall1.position.set(0, 2.5, -50);
             wall1.castShadow = true;
@@ -195,8 +199,8 @@
             objects.push(wall4);
 
             // Obstacles
-            const obstacleGeometry = new THREE.BoxGeometry(4, 4, 4);
-            const obstacleMaterial = new THREE.MeshStandardMaterial({ color: 0x444444 });
+            const obstacleGeometry = new THREE.DodecahedronGeometry(2.5, 0);
+            const obstacleMaterial = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.8, roughness: 0.2 });
             for (let i = 0; i < 15; i++) {
                 const obstacle = new THREE.Mesh(obstacleGeometry, obstacleMaterial);
                 obstacle.position.set(
@@ -280,9 +284,9 @@
             }
             targets.length = 0;
 
-            const targetGeometry = new THREE.BoxGeometry(1, 1, 1);
+            const targetGeometry = new THREE.SphereGeometry(0.75, 16, 8);
+            const targetMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000, metalness: 0.5, roughness: 0.3 });
             for (let i = 0; i < 20; i++) {
-                const targetMaterial = new THREE.MeshStandardMaterial({ color: new THREE.Color(Math.random(), Math.random(), Math.random()) });
                 const target = new THREE.Mesh(targetGeometry, targetMaterial);
 
                 let positionIsValid = false;
