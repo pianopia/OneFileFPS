@@ -93,6 +93,7 @@
 
         const objects = [];
         const targets = [];
+        const targetMovements = [];
         const moveForward = { value: false };
         const moveBackward = { value: false };
         const moveLeft = { value: false };
@@ -240,6 +241,7 @@
             // Clear existing targets
             targets.forEach(target => scene.remove(target));
             targets.length = 0;
+            targetMovements.length = 0;
             
             // This part of the reset is tricky because we added more objects.
             // A simple way is to tag objects or check their properties.
@@ -324,6 +326,16 @@
                 scene.add(target);
                 objects.push(target);
                 targets.push(target);
+
+                // Assign random movement parameters
+                targetMovements.push({
+                    target: target,
+                    velocity: new THREE.Vector3(
+                        (Math.random() - 0.5) * 2, 
+                        (Math.random() - 0.5) * 2, 
+                        (Math.random() - 0.5) * 2
+                    )
+                });
             }
         }
 
@@ -436,7 +448,28 @@
             }
 
             if (controls.isLocked) {
-                // NPC interaction prompt
+                // Update moving targets
+                targetMovements.forEach(tm => {
+                    tm.target.position.add(tm.velocity.clone().multiplyScalar(delta * 0.5));
+
+                    // Bounce off walls
+                    if (tm.target.position.x < -49 || tm.target.position.x > 49) tm.velocity.x *= -1;
+                    if (tm.target.position.z < -49 || tm.target.position.z > 49) tm.velocity.z *= -1;
+                    if (tm.target.position.y < 0.5 || tm.target.position.y > 4.5) tm.velocity.y *= -1;
+
+                    // Bounce off obstacles
+                    objects.forEach(obj => {
+                        if (obj.geometry.type === 'DodecahedronGeometry') {
+                            const distance = tm.target.position.distanceTo(obj.position);
+                            if (distance < 3.25) { // Obstacle radius + target radius
+                                const normal = tm.target.position.clone().sub(obj.position).normalize();
+                                tm.velocity.reflect(normal);
+                            }
+                        }
+                    });
+                });
+
+                // NPC interaction prompt""
                 const distanceToNPC = camera.position.distanceTo(npc.position);
                 if (distanceToNPC < 4) {
                     npcPromptElement.style.display = 'block';
