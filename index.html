@@ -405,7 +405,7 @@
             const now = audioContext.currentTime;
 
             const gainNode = audioContext.createGain();
-            gainNode.gain.setValueAtTime(0.1, now);
+            gainNode.gain.setValueAtTime(0.4, now);
             gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
             gainNode.connect(audioContext.destination);
 
@@ -437,7 +437,7 @@
                 const gainNode = audioContext.createGain();
                 gainNode.connect(audioContext.destination);
                 gainNode.gain.setValueAtTime(0, now);
-                gainNode.gain.linearRampToValueAtTime(0.05, now + 0.1);
+                gainNode.gain.linearRampToValueAtTime(0.1, now + 0.1);
                 gainNode.gain.linearRampToValueAtTime(0, now + 0.5);
 
 
