@@ -38,12 +38,16 @@
             text-align: center;
             cursor: pointer;
         }
-        #score {
+        #score, #timer {
             position: absolute;
             top: 20px;
             left: 20px;
             color: white;
             font-size: 20px;
+        }
+        #timer {
+            left: auto;
+            right: 20px;
         }
     </style>
 </head>
@@ -55,11 +59,13 @@
             W, A, S, D: Move<br>
             SPACE: Jump<br>
             MOUSE: Look<br>
-            CLICK: Shoot
+            CLICK: Shoot<br>
+            ESC: Reset Game
         </p>
     </div>
     <div id="crosshair" style="display: none;"></div>
     <div id="score" style="display: none;">Score: 0</div>
+    <div id="timer" style="display: none;">Time: 0.00</div>
     <canvas id="game-canvas"></canvas>
 
     <script type="importmap">
@@ -80,6 +86,7 @@
         let direction = new THREE.Vector3();
         let onGround = false;
         let score = 0;
+        let startTime, gameActive = false;
 
         const objects = [];
         const targets = [];
@@ -92,6 +99,7 @@
         const instructions = document.getElementById('instructions');
         const crosshair = document.getElementById('crosshair');
         const scoreElement = document.getElementById('score');
+        const timerElement = document.getElementById('timer');
 
         function init() {
             // Scene
@@ -118,11 +126,16 @@
                 instructions.style.display = 'none';
                 crosshair.style.display = 'block';
                 scoreElement.style.display = 'block';
+                timerElement.style.display = 'block';
+                if (!gameActive) {
+                    startGame();
+                }
             });
             controls.addEventListener('unlock', () => {
                 instructions.style.display = 'flex';
                 crosshair.style.display = 'none';
                 scoreElement.style.display = 'none';
+                timerElement.style.display = 'none';
             });
             scene.add(controls.getObject());
 
@@ -171,8 +184,57 @@
             scene.add(wall4);
             objects.push(wall4);
 
+            spawnTargets();
 
-            // Targets
+            // Event Listeners
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('click', shoot);
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function resetGame() {
+            gameActive = false;
+
+            // Clear existing targets
+            targets.forEach(target => scene.remove(target));
+            targets.length = 0;
+            
+            // Remove targets from objects array
+            for (let i = objects.length - 1; i >= 0; i--) {
+                if (objects[i].geometry.type === 'BoxGeometry' && objects[i].material.color) {
+                    const obj = objects.splice(i, 1)[0];
+                    scene.remove(obj);
+                }
+            }
+
+            spawnTargets();
+
+            // Reset player position and state
+            camera.position.set(0, 1.8, 0);
+            velocity.set(0, 0, 0);
+            direction.set(0, 0, 0);
+            moveForward.value = false;
+            moveBackward.value = false;
+            moveLeft.value = false;
+            moveRight.value = false;
+            canJump.value = false;
+
+            // Reset score and timer
+            score = 0;
+            scoreElement.textContent = `Score: 0`;
+            timerElement.textContent = `Time: 0.00`;
+
+            controls.unlock();
+        }
+
+        function startGame() {
+            gameActive = true;
+            startTime = performance.now();
+        }
+
+        function spawnTargets() {
+             // Targets
             const targetGeometry = new THREE.BoxGeometry(1, 1, 1);
             for (let i = 0; i < 20; i++) {
                 const targetMaterial = new THREE.MeshStandardMaterial({ color: new THREE.Color(Math.random(), Math.random(), Math.random()) });
@@ -188,12 +250,6 @@
                 objects.push(target);
                 targets.push(target);
             }
-
-            // Event Listeners
-            document.addEventListener('keydown', onKeyDown);
-            document.addEventListener('keyup', onKeyUp);
-            document.addEventListener('click', shoot);
-            window.addEventListener('resize', onWindowResize);
         }
 
         function onWindowResize() {
@@ -209,6 +265,7 @@
                 case 'KeyS': moveBackward.value = true; break;
                 case 'KeyD': moveRight.value = true; break;
                 case 'Space': if (canJump.value) velocity.y += 8; canJump.value = false; break;
+                case 'Escape': resetGame(); break;
             }
         }
 
@@ -222,7 +279,7 @@
         }
 
         function shoot() {
-            if (!controls.isLocked) return;
+            if (!controls.isLocked || !gameActive) return;
 
             const raycaster = new THREE.Raycaster(camera.getWorldPosition(new THREE.Vector3()), camera.getWorldDirection(new THREE.Vector3()));
             const intersects = raycaster.intersectObjects(targets);
@@ -244,8 +301,9 @@
                 scoreElement.textContent = `Score: ${score}`;
 
                 if (targets.length === 0) {
-                    alert("You win!");
-                    controls.unlock();
+                    const elapsedTime = (performance.now() - startTime) / 1000;
+                    alert(`You win! Your time: ${elapsedTime.toFixed(2)} seconds`);
+                    resetGame();
                 }
             }
         }
@@ -256,6 +314,11 @@
 
             const time = performance.now();
             const delta = (time - prevTime) / 1000;
+
+            if (gameActive && controls.isLocked) {
+                const elapsedTime = (time - startTime) / 1000;
+                timerElement.textContent = `Time: ${elapsedTime.toFixed(2)}`;
+            }
 
             if (controls.isLocked) {
                 // Gravity
